@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExamFlow · Timetable Generator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">E</div><div><b>ExamFlow</b><small>ACADEMIC PLANNER</small></div></div>
+      <div class="nav-label">WORKSPACE</div>
+      <a class="nav-item active" href="/"><span>▦</span> Dashboard</a>
+      <a class="nav-item" href="#subjects"><span>▤</span> Subjects</a>
+      <a class="nav-item" href="#timetable"><span>◷</span> Timetable</a>
+      <div class="sidebar-bottom">
+        <div class="algorithm-card"><div class="algo-icon">⌘</div><b>Smart scheduling</b><p>Graph coloring + backtracking finds conflict-free exam slots.</p></div>
+        <div class="user-chip"><div class="avatar">AR</div><div><b>College Admin</b><small>Semester workspace</small></div></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><span class="eyebrow">ACADEMIC OPERATIONS</span><h1>Exam timetable</h1><p class="subhead">Plan a smoother exam season, without student clashes.</p></div><a class="button secondary" href="/demo">＋ Load demo data</a></header>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}{% endif %}
+      {% endwith %}
+      <section class="stats">
+        <article class="stat-card"><div class="stat-top"><span>Subjects</span><span class="stat-symbol violet">▤</span></div><strong>{{ subjects|length }}</strong><small>Registered for scheduling</small></article>
+        <article class="stat-card"><div class="stat-top"><span>Scheduled exams</span><span class="stat-symbol green">✓</span></div><strong>{{ exams|length }}</strong><small>Generated timetable entries</small></article>
+        <article class="stat-card"><div class="stat-top"><span>Conflict policy</span><span class="stat-symbol amber">⌘</span></div><strong>0</strong><small>Same-semester slot clashes targeted</small></article>
+      </section>
+
+      <section class="panel" id="subjects">
+        <div class="panel-head"><div><span class="eyebrow">STEP 01</span><h2>Subject registry</h2><p>Add each paper and the semester or student group taking it.</p></div><span class="count-pill">{{ subjects|length }} subjects</span></div>
+        <form class="subject-form" method="post" action="/subjects/add">
+          <label>Subject code<input name="code" placeholder="e.g. IT401" required></label>
+          <label>Subject name<input name="name" placeholder="e.g. Operating Systems" required></label>
+          <label>Semester<input name="semester" placeholder="e.g. 4" required></label>
+          <label>Student group tags <input name="students" placeholder="e.g. IT-A, IT-B"></label>
+          <button class="button primary" type="submit">Add subject</button>
+        </form>
+        <div class="table-wrap"><table><thead><tr><th>CODE</th><th>SUBJECT</th><th>SEMESTER</th><th>GROUP TAGS</th><th></th></tr></thead><tbody>
+          {% for s in subjects %}<tr><td><span class="code">{{ s.code }}</span></td><td class="subject-name">{{ s.name }}</td><td><span class="semester">Sem {{ s.semester }}</span></td><td class="muted">{{ s.students or '—' }}</td><td><form method="post" action="/subjects/delete/{{ s.id }}" onsubmit="return confirm('Delete this subject and its timetable entry?')"><button class="icon-button" title="Delete subject" type="submit">×</button></form></td></tr>
+          {% else %}<tr><td colspan="5" class="empty">No subjects yet. Add a subject or load demo data.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </section>
+
+      <section class="panel generator">
+        <div class="panel-head"><div><span class="eyebrow">STEP 02</span><h2>Generate schedule</h2><p>Choose your exam window, sessions, and available rooms.</p></div><div class="spark">✳</div></div>
+        <form method="post" action="/generate" class="generate-form">
+          <label>First exam date<input type="date" name="start_date" required value="{{ request.form.get('start_date', '') }}"></label>
+          <label>Time slots <input name="slots" value="09:00-12:00,13:00-16:00" required><small>Separate multiple slots with commas.</small></label>
+          <label>Available rooms <input name="rooms" value="Exam Hall A,Exam Hall B" required><small>Separate room names with commas.</small></label>
+          <label>Gap between exam days <select name="gap"><option value="0">No extra gap</option><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option></select></label>
+          <div class="form-actions"><button class="button primary" type="submit">✦ Generate timetable</button><span class="muted">Uses graph coloring + backtracking</span></div>
+        </form>
+      </section>
+
+      <section class="panel" id="timetable">
+        <div class="panel-head"><div><span class="eyebrow">STEP 03</span><h2>Generated timetable</h2><p>Review, print, or save this schedule as a PDF from your browser.</p></div><div class="table-actions"><button class="button secondary" onclick="window.print()">⇩ Print / Save PDF</button><form method="post" action="/timetable/clear" onsubmit="return confirm('Clear the generated timetable?')"><button class="button text-button" type="submit">Clear</button></form></div></div>
+        <div class="table-wrap"><table id="exam-table"><thead><tr><th>DATE</th><th>TIME SLOT</th><th>SUBJECT</th><th>SEMESTER</th><th>ROOM</th></tr></thead><tbody>
+          {% for e in exams %}<tr><td class="date-cell">{{ e.exam_date }}</td><td><span class="time-pill">{{ e.slot }}</span></td><td><div class="subject-name">{{ e.name }}</div><div class="muted code">{{ e.code }}</div></td><td><span class="semester">Sem {{ e.semester }}</span></td><td>{{ e.room }}</td></tr>
+          {% else %}<tr><td colspan="5" class="empty">Your generated exam schedule will appear here.</td></tr>{% endfor %}
+        </tbody></table></div>
+        <div class="panel-foot"><span class="status-dot"></span> Schedule is stored locally in SQLite on this computer.</div>
+      </section>
+      <footer>ExamFlow · College Semester Project <span>Python · Flask · SQLite · Graph Coloring</span></footer>
+    </main>
+  </div>
+</body>
+</html>
